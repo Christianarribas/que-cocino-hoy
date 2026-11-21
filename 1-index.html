@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Qué cocino hoy</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== 1. CABECERA ===== -->
+  <header class="cabecera">
+    <h1 class="titulo">🍳 Qué cocino hoy</h1>
+    <p class="subtitulo">Dime qué tienes en la nevera y te propongo recetas</p>
+  </header>
+
+  <main class="contenedor">
+
+    <!-- ===== 2. FORMULARIO PARA AÑADIR INGREDIENTES ===== -->
+    <form id="formulario-ingredientes" class="formulario">
+      <input id="campo-ingrediente" class="campo" type="text"
+             placeholder="Ej: pollo, tomate, arroz..." autocomplete="off">
+      <button type="submit" class="boton boton-secundario">Añadir</button>
+    </form>
+
+    <!-- Aquí JS dibuja las etiquetas (chips) de los ingredientes -->
+    <div id="lista-etiquetas" class="etiquetas"></div>
+
+    <button id="boton-buscar" class="boton boton-principal" type="button">🔍 Buscar recetas</button>
+
+    <!-- ===== 3. MENSAJES (cargando, errores, sin resultados) ===== -->
+    <p id="mensaje" class="mensaje"></p>
+
+    <!-- ===== 4. LISTA DE RECETAS ===== -->
+    <section id="lista-recetas" class="recetas"></section>
+  </main>
+
+  <!-- ===== 5. VENTANA CON EL DETALLE DE UNA RECETA ===== -->
+  <div id="ventana" class="ventana oculto">
+    <div class="ventana-caja">
+      <button id="boton-cerrar" class="boton-cerrar" aria-label="Cerrar">✕</button>
+      <div id="detalle-receta"></div>
+    </div>
+  </div>
+
+  <footer class="pie">Recetas de <a href="https://www.themealdb.com" target="_blank" rel="noopener">TheMealDB</a></footer>
+
+  <script src="app.js"></script>
+</body>
+</html>

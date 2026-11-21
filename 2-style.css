@@ -1,0 +1,226 @@
+/* ==========================================================
+   ÍNDICE
+   1. Variables de color
+   2. Estilos generales
+   3. Cabecera
+   4. Formulario y etiquetas
+   5. Botones
+   6. Mensajes
+   7. Lista de recetas (tarjetas)
+   8. Ventana de detalle
+   9. Pie de página
+   10. Pantallas grandes
+   ========================================================== */
+
+/* ===== 1. VARIABLES DE COLOR (se cambian aquí y afectan a toda la web) ===== */
+:root {
+  --color-principal: #ff6b35;
+  --color-principal-oscuro: #e0521d;
+  --color-fondo: #fff8f0;
+  --color-tarjeta: #ffffff;
+  --color-texto: #2d2a26;
+  --color-suave: #7a7168;
+  --color-etiqueta: #ffe3d3;
+}
+
+/* ===== 2. ESTILOS GENERALES ===== */
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  background: var(--color-fondo);
+  color: var(--color-texto);
+  line-height: 1.5;
+}
+
+.contenedor {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 16px;
+}
+
+.oculto { display: none; }
+
+/* ===== 3. CABECERA ===== */
+.cabecera {
+  background: linear-gradient(135deg, #ff6b35, #ffa63d);
+  color: white;
+  text-align: center;
+  padding: 28px 16px 36px;
+  border-radius: 0 0 28px 28px;
+  box-shadow: 0 4px 14px rgba(255, 107, 53, 0.35);
+}
+.titulo { margin: 0; font-size: 2rem; }
+.subtitulo { margin: 6px 0 0; opacity: 0.95; }
+
+/* ===== 4. FORMULARIO Y ETIQUETAS ===== */
+.formulario {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+.campo {
+  flex: 1;
+  min-width: 0;
+  padding: 14px;
+  font-size: 1rem;
+  border: 2px solid #f0d9c8;
+  border-radius: 12px;
+  background: white;
+}
+.campo:focus { outline: none; border-color: var(--color-principal); }
+
+.etiquetas {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 14px 0;
+  min-height: 8px;
+}
+.etiqueta {
+  background: var(--color-etiqueta);
+  color: var(--color-principal-oscuro);
+  padding: 6px 6px 6px 14px;
+  border-radius: 999px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.etiqueta-borrar {
+  border: none;
+  background: var(--color-principal);
+  color: white;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+/* ===== 5. BOTONES ===== */
+.boton {
+  border: none;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 14px 18px;
+}
+.boton-principal {
+  width: 100%;
+  background: var(--color-principal);
+  color: white;
+  box-shadow: 0 3px 0 var(--color-principal-oscuro);
+}
+.boton-principal:active { transform: translateY(2px); box-shadow: none; }
+.boton-secundario { background: #2d2a26; color: white; }
+
+/* ===== 6. MENSAJES ===== */
+.mensaje {
+  text-align: center;
+  color: var(--color-suave);
+  margin: 16px 0;
+}
+
+/* ===== 7. LISTA DE RECETAS (tarjetas) ===== */
+.recetas {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr); /* 2 columnas en móvil */
+  gap: 12px;
+  margin-top: 8px;
+}
+.tarjeta {
+  background: var(--color-tarjeta);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  border: none;
+  padding: 0;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+}
+.tarjeta:active { transform: scale(0.98); }
+.tarjeta-foto {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  display: block;
+}
+.tarjeta-nombre {
+  margin: 0;
+  padding: 10px 12px 4px;
+  font-size: 0.95rem;
+  font-weight: 700;
+}
+.tarjeta-coincidencias {
+  margin: 0;
+  padding: 0 12px 12px;
+  font-size: 0.8rem;
+  color: var(--color-suave);
+}
+
+/* ===== 8. VENTANA DE DETALLE ===== */
+.ventana {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;   /* en móvil sube desde abajo */
+  justify-content: center;
+  z-index: 10;
+}
+.ventana.oculto { display: none; }
+.ventana-caja {
+  background: white;
+  width: 100%;
+  max-width: 640px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 24px 24px 0 0;
+  position: relative;
+  padding-bottom: 24px;
+}
+.boton-cerrar {
+  position: sticky;
+  top: 10px;
+  float: right;
+  margin: 10px 10px 0 0;
+  width: 38px;
+  height: 38px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.65);
+  color: white;
+  font-size: 1.1rem;
+  cursor: pointer;
+  z-index: 2;
+}
+.detalle-foto { width: 100%; max-height: 260px; object-fit: cover; display: block; }
+.detalle-cuerpo { padding: 0 20px; }
+.detalle-cuerpo h2 { margin: 16px 0 4px; }
+.detalle-cuerpo h3 { color: var(--color-principal-oscuro); margin-bottom: 6px; }
+.detalle-datos { color: var(--color-suave); margin: 0 0 8px; }
+.detalle-ingredientes { padding-left: 20px; margin: 0; }
+.detalle-ingredientes li.lo-tengo { font-weight: 700; color: #2e7d32; }
+.detalle-instrucciones { white-space: pre-line; }
+.nota-idioma { font-size: 0.8rem; color: var(--color-suave); }
+
+/* ===== 9. PIE DE PÁGINA ===== */
+.pie {
+  text-align: center;
+  color: var(--color-suave);
+  font-size: 0.85rem;
+  padding: 20px;
+}
+.pie a { color: var(--color-principal-oscuro); }
+
+/* ===== 10. PANTALLAS GRANDES ===== */
+@media (min-width: 700px) {
+  .recetas { grid-template-columns: repeat(4, 1fr); }
+  .ventana { align-items: center; }
+  .ventana-caja { border-radius: 24px; }
+}
