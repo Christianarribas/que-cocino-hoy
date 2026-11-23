@@ -99,11 +99,98 @@ const diccionario = {
   "guisantes": "peas"
 };
 
-// Convierte "Tomate " en "tomatoes" (minúsculas, sin espacios sobrantes)
+// Todas las comparaciones comparten la misma normalización.
+function normalizar(texto) {
+  return texto.normalize("NFD").replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase().trim().replace(/[_\s]+/g, " ");
+}
+
+const traducciones = Object.fromEntries(
+  Object.entries(diccionario).map(([es, en]) => [normalizar(es), en])
+);
+
+// Una familia puede tener varios nombres exactos en la base de recetas.
+// No buscamos solo por título: consultamos los ingredientes de cada familia.
+const familias = {
+  pasta: ["spaghetti", "macaroni", "penne_rigate", "penne_pasta", "tagliatelle", "fettuccine", "lasagne_sheets", "linguine_pasta"],
+  macarrones: ["macaroni", "penne_rigate", "penne_pasta"],
+  espaguetis: ["spaghetti"],
+  huevos: ["eggs", "egg"],
+  pollo: ["chicken", "chicken_breast", "chicken_breasts", "chicken_thighs"],
+  arroz: ["rice", "basmati_rice", "long_grain_rice", "arborio_rice", "brown_rice"],
+  queso: ["cheese", "cheddar_cheese", "parmesan_cheese", "mozzarella"],
+  tomate: ["tomatoes", "tomato", "chopped_tomatoes", "cherry_tomatoes"],
+  cebolla: ["onions", "onion", "red_onions", "spring_onions"],
+  pimiento: ["red_pepper", "green_pepper", "yellow_pepper", "red_bell_pepper"],
+  patata: ["potatoes", "potato"]
+};
+const alias = {
+  macarron: "macarrones", macaroni: "macarrones", penne: "macarrones",
+  espagueti: "espaguetis", spaghetti: "espaguetis", espaguetti: "espaguetis",
+  huevo: "huevos", egg: "huevos", eggs: "huevos", pollos: "pollo",
+  arroces: "arroz", quesos: "queso", tomates: "tomate", cebollas: "cebolla",
+  pimientos: "pimiento", patatas: "patata", papas: "patata", papa: "patata",
+  tortillas: "tortilla", ensaladas: "ensalada"
+};
+const platos = { tortilla: "omelette", ensalada: "salad" };
+
+function claveIngrediente(texto) {
+  const limpio = normalizar(texto);
+  if (alias[limpio]) return alias[limpio];
+  if (traducciones[limpio] || familias[limpio] || platos[limpio]) return limpio;
+  // Solo singularizamos si el singular existe en el diccionario.
+  for (const singular of [limpio.replace(/es$/, ""), limpio.replace(/s$/, "")]) {
+    if (traducciones[singular] || familias[singular]) return singular;
+  }
+  return limpio;
+}
+
 function traducirIngrediente(texto) {
-  const limpio = texto.trim().toLowerCase();
-  const traducido = diccionario[limpio] || limpio;
-  return traducido.replace(/\s+/g, "_"); // la API usa guiones bajos
+  const clave = claveIngrediente(texto);
+  return (traducciones[clave] || clave).replace(/\s+/g, "_");
+}
+
+function ingredientesAPI(texto) {
+  const clave = claveIngrediente(texto);
+  return familias[clave] || [traducirIngrediente(clave)];
+}
+
+// Las promesas se comparten entre sinónimos y búsquedas repetidas.
+const cacheAPI = new Map();
+function consultarAPI(ruta) {
+  if (!cacheAPI.has(ruta)) {
+    const peticion = fetch(URL_API + ruta, { signal: AbortSignal.timeout(15000) })
+      .then(function (r) {
+        if (!r.ok) throw new Error("API " + r.status);
+        return r.json();
+      }).catch(function (error) {
+        cacheAPI.delete(ruta); // permite reintentar tras un fallo de conexión
+        throw error;
+      });
+    cacheAPI.set(ruta, peticion);
+  }
+  return cacheAPI.get(ruta);
+}
+
+async function recetasPara(texto) {
+  const clave = claveIngrediente(texto);
+  const rutas = platos[clave]
+    ? ["search.php?s=" + encodeURIComponent(platos[clave])]
+    : ingredientesAPI(texto).map(i => "filter.php?i=" + encodeURIComponent(i));
+  const respuestas = await Promise.allSettled(rutas.map(consultarAPI));
+  const recetas = new Map();
+  let fallos = 0;
+  respuestas.forEach(function (respuesta) {
+    if (respuesta.status === "rejected") { fallos++; return; }
+    (respuesta.value.meals || []).forEach(receta => recetas.set(receta.idMeal, receta));
+  });
+  return { recetas: [...recetas.values()], fallos: fallos, consultas: rutas.length };
+}
+
+function coincideIngrediente(ingrediente, mio) {
+  if (platos[claveIngrediente(mio)]) return false;
+  const limpio = normalizar(ingrediente);
+  return ingredientesAPI(mio).some(i => normalizar(i) === limpio);
 }
 
 /* ===== 4. AÑADIR Y QUITAR INGREDIENTES ===== */
@@ -135,7 +222,7 @@ function dibujarEtiquetas() {
 function añadirIngredientes(texto) {
   texto.split(",").forEach(function (trozo) {
     const nombre = trozo.trim().toLowerCase();
-    if (nombre && !ingredientes.includes(nombre)) {
+    if (nombre && !ingredientes.some(i => claveIngrediente(i) === claveIngrediente(nombre))) {
       ingredientes.push(nombre);
     }
   });
@@ -150,11 +237,10 @@ formularioIngredientes.addEventListener("submit", function (evento) {
 });
 
 /* ===== 5. BUSCAR RECETAS EN LA API =====
-   La ruta gratuita filter.php?i= solo acepta UN ingrediente.
-   Así que pedimos una lista por cada ingrediente y luego contamos
-   en cuántas listas sale cada receta: las que más veces salen van primero. */
+   Unimos variantes de cada ingrediente, sin contar dos veces una receta.
+   Tortilla y ensalada se aceptan como platos, no como ingredientes. */
 async function buscarRecetas() {
-  // Si el usuario escribió algo y no pulsó "Añadir", lo añadimos ahora
+  if (botonBuscar.disabled) return;
   if (campoIngrediente.value.trim()) {
     añadirIngredientes(campoIngrediente.value);
     campoIngrediente.value = "";
@@ -164,51 +250,50 @@ async function buscarRecetas() {
     listaRecetas.innerHTML = "";
     return;
   }
-
+  const buscados = ingredientes.slice();
+  botonBuscar.disabled = true;
   mensaje.textContent = "Buscando recetas...";
   listaRecetas.innerHTML = "";
 
   try {
-    // Una petición por ingrediente, todas a la vez
-    const respuestas = await Promise.all(
-      ingredientes.map(function (nombre) {
-        const url = URL_API + "filter.php?i=" + encodeURIComponent(traducirIngrediente(nombre));
-        return fetch(url).then(function (r) { return r.json(); });
-      })
-    );
-
-    // Contamos coincidencias por receta: { idReceta: {receta, coincidencias} }
-    const cuenta = {};
-    respuestas.forEach(function (respuesta) {
-      (respuesta.meals || []).forEach(function (receta) {
-        if (!cuenta[receta.idMeal]) {
-          cuenta[receta.idMeal] = { receta: receta, coincidencias: 0 };
-        }
-        cuenta[receta.idMeal].coincidencias++;
-      });
-    });
-
-    // Ordenamos: primero las que usan más ingredientes tuyos
-    const resultados = Object.values(cuenta).sort(function (a, b) {
-      return b.coincidencias - a.coincidencias;
-    });
-
-    if (resultados.length === 0) {
-      mensaje.textContent = "No encontré recetas. Prueba con otros ingredientes (o en inglés).";
+    const respuestas = await Promise.all(buscados.map(recetasPara));
+    // Si cambian las etiquetas mientras llega la API, no mostramos datos antiguos.
+    if (JSON.stringify(buscados) !== JSON.stringify(ingredientes)) {
+      mensaje.textContent = "Has cambiado la búsqueda. Pulsa Buscar recetas.";
       return;
     }
-
-    mensaje.textContent = "";
-    dibujarRecetas(resultados.slice(0, 24)); // máximo 24 para que sea ligero
+    const cuenta = new Map();
+    respuestas.forEach(function (respuesta) {
+      respuesta.recetas.forEach(function (receta) {
+        if (!cuenta.has(receta.idMeal)) cuenta.set(receta.idMeal, { receta, coincidencias: 0 });
+        cuenta.get(receta.idMeal).coincidencias++;
+      });
+    });
+    const resultados = [...cuenta.values()].sort((a, b) =>
+      b.coincidencias - a.coincidencias || a.receta.strMeal.localeCompare(b.receta.strMeal));
+    const fallos = respuestas.reduce((n, r) => n + r.fallos, 0);
+    if (!resultados.length) {
+      mensaje.textContent = fallos
+        ? "No se pudo completar la búsqueda. Comprueba tu conexión y vuelve a intentarlo."
+        : "No encontré recetas para esa búsqueda. Prueba con otro ingrediente o plato.";
+      return;
+    }
+    const sonPlatos = buscados.some(i => platos[claveIngrediente(i)]);
+    mensaje.textContent = resultados.length + " recetas encontradas" +
+      (resultados.length > 24 ? " · Mostrando las primeras 24." : ".") +
+      (fallos ? " Algunos resultados no se pudieron cargar. Puedes reintentar." : "");
+    dibujarRecetas(resultados.slice(0, 24), sonPlatos);
   } catch (error) {
     mensaje.textContent = "Algo falló al buscar. Revisa tu conexión e inténtalo otra vez.";
+  } finally {
+    botonBuscar.disabled = false;
   }
 }
 
 botonBuscar.addEventListener("click", buscarRecetas);
 
 /* ===== 6. DIBUJAR LA LISTA DE RECETAS ===== */
-function dibujarRecetas(resultados) {
+function dibujarRecetas(resultados, sonPlatos = false) {
   listaRecetas.innerHTML = "";
   resultados.forEach(function (item) {
     const tarjeta = document.createElement("button");
@@ -227,7 +312,9 @@ function dibujarRecetas(resultados) {
 
     const coincidencias = document.createElement("p");
     coincidencias.className = "tarjeta-coincidencias";
-    coincidencias.textContent = "Usa " + item.coincidencias + " de " + ingredientes.length + " de tus ingredientes";
+    coincidencias.textContent = sonPlatos
+      ? "Coincide con " + item.coincidencias + " de " + ingredientes.length + " términos"
+      : "Usa " + item.coincidencias + " de " + ingredientes.length + " de tus ingredientes";
 
     tarjeta.append(foto, nombre, coincidencias);
     tarjeta.addEventListener("click", function () {
@@ -256,8 +343,7 @@ async function verDetalle(idReceta) {
       if (ingrediente && ingrediente.trim()) {
         // ¿Es uno de los que tiene el usuario? Lo marcamos en verde
         const loTengo = ingredientes.some(function (mio) {
-          const ingles = traducirIngrediente(mio).replace(/_/g, " ");
-          return ingrediente.toLowerCase().includes(ingles.replace(/s$/, ""));
+          return coincideIngrediente(ingrediente, mio);
         });
         htmlIngredientes += "<li" + (loTengo ? " class='lo-tengo'" : "") + ">" +
           escaparHtml((medida || "").trim() + " " + ingrediente.trim()) +
